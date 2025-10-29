@@ -1,9 +1,0 @@
-streamlit
-pandas
-numpy
-matplotlib
-seaborn
-scikit-learn
-qiskit>=1.0.0
-qiskit-machine-learning>=0.7.0
-qiskit-algorithms>=0.3.0
