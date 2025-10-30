@@ -818,7 +818,7 @@ if df is not None:
                                 best_preprocessor = best_fold[1]['preprocessor']
                                 
                                 # Make predictions on test set
-                                X_test_processed = best_preprocessor.transform(X_test_scaled)
+                                X_test_processed, _ = best_preprocessor.transform(X_test_scaled)
                                 X_test_tensor = torch.tensor(X_test_processed, dtype=torch.float32)
                                 best_model.eval()
                                 with torch.no_grad():
