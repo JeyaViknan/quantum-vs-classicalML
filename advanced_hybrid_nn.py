@@ -342,7 +342,7 @@ def visualize_quantum_outputs(model, X_test, n_samples=50):
         quantum_outputs = []
         for i in range(X_test_tensor.shape[0]):
             q_out = model.quantum_net(quantum_input[i:i+1])
-            quantum_outputs.append(to_numpy(q_out).flatten())
+            quantum_outputs.append(q_out.detach().cpu().numpy().flatten())
         
         quantum_out_np = np_regular.array(quantum_outputs)
     
