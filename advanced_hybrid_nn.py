@@ -226,8 +226,7 @@ class AdvancedHybridTrainer:
         model.eval()
         with torch.no_grad():
             y_pred_scaled_tensor = model(X_val_tensor)
-            print(f"[DEBUG] requires_grad: {y_pred_scaled_tensor.requires_grad}")
-            y_pred_scaled = to_numpy(y_pred_scaled_tensor).flatten()
+            y_pred_scaled = y_pred_scaled_tensor.detach().cpu().numpy().flatten()
         
         y_pred = preprocessor.y_scaler.inverse_transform(y_pred_scaled.reshape(-1, 1)).flatten()
         y_val_original = y_val.values if hasattr(y_val, 'values') else y_val
@@ -339,9 +338,13 @@ def visualize_quantum_outputs(model, X_test, n_samples=50):
     with torch.no_grad():
         classical_out = model.classical_net(X_test_tensor)
         quantum_input = X_test_tensor[:, :4] if X_test_tensor.shape[1] >= 4 else X_test_tensor
-        quantum_out = model.quantum_net(quantum_input)
-    
-    quantum_out_np = to_numpy(quantum_out)
+        
+        quantum_outputs = []
+        for i in range(X_test_tensor.shape[0]):
+            q_out = model.quantum_net(quantum_input[i:i+1])
+            quantum_outputs.append(to_numpy(q_out).flatten())
+        
+        quantum_out_np = np_regular.array(quantum_outputs)
     
     fig, axes = plt.subplots(2, 2, figsize=(12, 10))
     
