@@ -34,12 +34,14 @@ def create_quantum_circuit(n_qubits, n_layers):
     """Create a quantum circuit with specified number of qubits and layers"""
     dev = qml.device("default.qubit", wires=n_qubits)
     
-    @qml.qnode(dev, interface="torch")
+    @qml.qnode(dev, interface="torch", diff_method="backprop")
     def quantum_circuit(inputs, weights):
         """Quantum circuit with angle embedding and entanglement"""
         qml.AngleEmbedding(inputs, wires=range(n_qubits))
         qml.BasicEntanglerLayers(weights, wires=range(n_qubits))
-        return qml.math.stack([qml.expval(qml.PauliZ(i)) for i in range(n_qubits)])
+        # Return measurements - using stack to ensure proper tensor output
+        measurements = [qml.expval(qml.PauliZ(i)) for i in range(n_qubits)]
+        return qml.math.stack(measurements)
     
     weight_shapes = {"weights": (n_layers, n_qubits)}
     quantum_layer = qml.qnn.TorchLayer(quantum_circuit, weight_shapes)
@@ -89,11 +91,27 @@ class AdvancedHybridNN(nn.Module):
         
         quantum_out = self.quantum_net(quantum_input)
         
-        # Ensure quantum_out is a tensor with the right shape
+        # The quantum layer should return a torch.Tensor when interface="torch"
+        # Ensure it's a tensor and on the correct device
         if not isinstance(quantum_out, torch.Tensor):
-            quantum_out = torch.tensor(quantum_out, dtype=torch.float32, device=x.device)
+            # This should not happen with interface="torch", but handle gracefully
+            raise TypeError(f"Quantum layer returned {type(quantum_out)}, expected torch.Tensor. "
+                          f"Check quantum circuit definition and interface settings.")
+        
+        # Ensure it's on the correct device
+        if quantum_out.device != x.device:
+            quantum_out = quantum_out.to(x.device)
+        
+        # Ensure correct dimensions: should be [batch_size, n_qubits]
         if quantum_out.dim() == 1:
-            quantum_out = quantum_out.unsqueeze(0)
+            # If batch_size == 1, it might be a 1D tensor
+            if quantum_out.shape[0] == self.n_qubits:
+                quantum_out = quantum_out.unsqueeze(0)
+        elif quantum_out.dim() > 2:
+            # Flatten extra dimensions
+            quantum_out = quantum_out.view(quantum_out.shape[0], -1)
+            if quantum_out.shape[1] > self.n_qubits:
+                quantum_out = quantum_out[:, :self.n_qubits]
         
         combined_input = torch.cat((classical_out, quantum_out), dim=1)
         return self.combined(combined_input)
