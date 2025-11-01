@@ -819,10 +819,14 @@ if df is not None:
                                 
                                 # Make predictions on test set
                                 X_test_processed, _ = best_preprocessor.transform(X_test_scaled)
-                                X_test_tensor = torch.tensor(X_test_processed, dtype=torch.float32)
+                                device = next(best_model.parameters()).device
+                                X_test_tensor = torch.tensor(X_test_processed, dtype=torch.float32).to(device)
                                 best_model.eval()
                                 with torch.no_grad():
-                                    y_pred_advanced = best_model(X_test_tensor).detach().cpu().numpy().flatten()
+                                    y_pred_scaled = best_model(X_test_tensor).detach().cpu().numpy().flatten()
+                                
+                                # Inverse transform predictions back to original scale
+                                y_pred_advanced = best_preprocessor.y_scaler.inverse_transform(y_pred_scaled.reshape(-1, 1)).flatten()
                                 
                                 results['Advanced Hybrid NN (with PCA)'] = {
                                     'model': best_model,

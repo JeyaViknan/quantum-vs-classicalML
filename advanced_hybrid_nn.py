@@ -30,20 +30,21 @@ def to_numpy(tensor):
 # 1. Quantum Circuit Definition
 # ===========================================
 
-n_qubits = 4
-n_layers = 2
-
-dev = qml.device("default.qubit", wires=n_qubits)
-
-@qml.qnode(dev, interface="torch")
-def quantum_circuit(inputs, weights):
-    """Quantum circuit with angle embedding and entanglement"""
-    qml.AngleEmbedding(inputs, wires=range(n_qubits))
-    qml.BasicEntanglerLayers(weights, wires=range(n_qubits))
-    return qml.math.stack([qml.expval(qml.PauliZ(i)) for i in range(n_qubits)])
-
-weight_shapes = {"weights": (n_layers, n_qubits)}
-quantum_layer = qml.qnn.TorchLayer(quantum_circuit, weight_shapes)
+def create_quantum_circuit(n_qubits, n_layers):
+    """Create a quantum circuit with specified number of qubits and layers"""
+    dev = qml.device("default.qubit", wires=n_qubits)
+    
+    @qml.qnode(dev, interface="torch")
+    def quantum_circuit(inputs, weights):
+        """Quantum circuit with angle embedding and entanglement"""
+        qml.AngleEmbedding(inputs, wires=range(n_qubits))
+        qml.BasicEntanglerLayers(weights, wires=range(n_qubits))
+        return qml.math.stack([qml.expval(qml.PauliZ(i)) for i in range(n_qubits)])
+    
+    weight_shapes = {"weights": (n_layers, n_qubits)}
+    quantum_layer = qml.qnn.TorchLayer(quantum_circuit, weight_shapes)
+    
+    return quantum_layer
 
 # ===========================================
 # 2. Advanced Hybrid Model Definition
@@ -52,7 +53,7 @@ quantum_layer = qml.qnn.TorchLayer(quantum_circuit, weight_shapes)
 class AdvancedHybridNN(nn.Module):
     """Advanced Hybrid Quantum-Classical Neural Network"""
     
-    def __init__(self, input_dim, quantum_input_dim=4):
+    def __init__(self, input_dim, quantum_input_dim=4, n_qubits=4, n_layers=2):
         super(AdvancedHybridNN, self).__init__()
         
         self.classical_net = nn.Sequential(
@@ -63,11 +64,13 @@ class AdvancedHybridNN(nn.Module):
             nn.ReLU(),
         )
         
-        self.quantum_net = quantum_layer
+        # Create a unique quantum layer for this instance
+        self.quantum_net = create_quantum_circuit(n_qubits, n_layers)
         self.quantum_input_dim = quantum_input_dim
+        self.n_qubits = n_qubits
         
         self.combined = nn.Sequential(
-            nn.Linear(32 + 4, 16),
+            nn.Linear(32 + n_qubits, 16),
             nn.ReLU(),
             nn.Dropout(0.1),
             nn.Linear(16, 1)
@@ -78,14 +81,19 @@ class AdvancedHybridNN(nn.Module):
         classical_out = self.classical_net(x)
         
         quantum_input = x[:, :self.quantum_input_dim] if x.shape[1] >= self.quantum_input_dim else x
-        if quantum_input.shape[1] < 4:
-            padding = torch.zeros(quantum_input.shape[0], 4 - quantum_input.shape[1], device=x.device)
+        if quantum_input.shape[1] < self.n_qubits:
+            padding = torch.zeros(quantum_input.shape[0], self.n_qubits - quantum_input.shape[1], device=x.device)
             quantum_input = torch.cat([quantum_input, padding], dim=1)
+        elif quantum_input.shape[1] > self.n_qubits:
+            quantum_input = quantum_input[:, :self.n_qubits]
         
         quantum_out = self.quantum_net(quantum_input)
         
-        if isinstance(quantum_out, list):
-            quantum_out = torch.stack(quantum_out, dim=0)
+        # Ensure quantum_out is a tensor with the right shape
+        if not isinstance(quantum_out, torch.Tensor):
+            quantum_out = torch.tensor(quantum_out, dtype=torch.float32, device=x.device)
+        if quantum_out.dim() == 1:
+            quantum_out = quantum_out.unsqueeze(0)
         
         combined_input = torch.cat((classical_out, quantum_out), dim=1)
         return self.combined(combined_input)
@@ -176,9 +184,14 @@ class AdvancedHybridTrainer:
         X_val_tensor = torch.tensor(X_val_processed, dtype=torch.float32).to(self.device)
         y_val_tensor = torch.tensor(y_val_scaled, dtype=torch.float32).reshape(-1, 1).to(self.device)
         
-        quantum_input_dim = min(X_train_processed.shape[1], 4)
+        quantum_input_dim = min(X_train_processed.shape[1], self.n_qubits)
         
-        model = AdvancedHybridNN(input_dim=X_train_processed.shape[1], quantum_input_dim=quantum_input_dim).to(self.device)
+        model = AdvancedHybridNN(
+            input_dim=X_train_processed.shape[1], 
+            quantum_input_dim=quantum_input_dim,
+            n_qubits=self.n_qubits,
+            n_layers=self.n_layers
+        ).to(self.device)
         optimizer = Adam(model.parameters(), lr=self.learning_rate)
         scheduler = CosineAnnealingLR(optimizer, T_max=epochs)
         loss_fn = nn.MSELoss()
@@ -332,29 +345,54 @@ def visualize_quantum_outputs(model, X_test, n_samples=50):
     """Visualize quantum layer outputs"""
     model.eval()
     device = next(model.parameters()).device
+    n_qubits = model.n_qubits if hasattr(model, 'n_qubits') else 4
     
     X_test_tensor = torch.tensor(X_test[:n_samples], dtype=torch.float32).to(device)
     
     with torch.no_grad():
         classical_out = model.classical_net(X_test_tensor)
-        quantum_input = X_test_tensor[:, :4] if X_test_tensor.shape[1] >= 4 else X_test_tensor
+        quantum_input = X_test_tensor[:, :min(n_qubits, X_test_tensor.shape[1])]
+        
+        if quantum_input.shape[1] < n_qubits:
+            padding = torch.zeros(quantum_input.shape[0], n_qubits - quantum_input.shape[1], device=device)
+            quantum_input = torch.cat([quantum_input, padding], dim=1)
         
         quantum_outputs = []
         for i in range(X_test_tensor.shape[0]):
             q_out = model.quantum_net(quantum_input[i:i+1])
-            quantum_outputs.append(q_out.detach().cpu().numpy().flatten())
+            if isinstance(q_out, torch.Tensor):
+                quantum_outputs.append(q_out.detach().cpu().numpy().flatten())
+            else:
+                quantum_outputs.append(np_regular.asarray(q_out).flatten())
         
         quantum_out_np = np_regular.array(quantum_outputs)
     
-    fig, axes = plt.subplots(2, 2, figsize=(12, 10))
+    # Dynamically create subplot grid based on n_qubits
+    n_cols = min(n_qubits, 3)
+    n_rows = (n_qubits + n_cols - 1) // n_cols  # Ceiling division
     
-    for i in range(4):
-        ax = axes[i // 2, i % 2]
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(4*n_cols, 4*n_rows))
+    if n_qubits == 1:
+        axes = [axes]
+    elif n_rows == 1:
+        if hasattr(axes, '__len__') and not isinstance(axes, str):
+            axes = list(axes)
+        else:
+            axes = [axes]
+    else:
+        axes = axes.flatten() if hasattr(axes, 'flatten') else axes
+    
+    for i in range(n_qubits):
+        ax = axes[i] if n_qubits > 1 else axes[0]
         ax.hist(quantum_out_np[:, i], bins=20, alpha=0.7, color='steelblue', edgecolor='black')
         ax.set_xlabel(f'Qubit {i} Output', fontsize=11, fontweight='bold')
         ax.set_ylabel('Frequency', fontsize=11, fontweight='bold')
         ax.set_title(f'Quantum Output Distribution - Qubit {i}', fontsize=12, fontweight='bold')
         ax.grid(True, alpha=0.3, axis='y')
+    
+    # Hide unused subplots
+    for i in range(n_qubits, len(axes)):
+        axes[i].axis('off')
     
     plt.tight_layout()
     return fig
