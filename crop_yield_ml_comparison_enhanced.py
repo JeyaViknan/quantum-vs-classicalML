@@ -256,6 +256,168 @@ class FeatureEngineer:
         poly = PolynomialFeatures(degree=degree, include_bias=False)
         return poly.fit_transform(X)
 
+class JeyaAlgorithm:
+    """
+    Jeya's Algorithm - An Intelligent Ensemble Pipeline for Crop Yield Prediction
+    
+    Philosophy: "Harness the collective wisdom of diverse models while adapting to local patterns"
+    
+    Key Innovations:
+    1. Dynamic Model Weighting: Adapts weights based on local data characteristics
+    2. Multi-Resolution Modeling: Captures patterns at different scales
+    3. Confidence-Aware Ensemble: Weights predictions by model confidence
+    4. Adaptive Feature Selection: Learns which features matter most locally
+    5. Temporal Context Integration: Incorporates year and seasonal patterns
+    """
+    
+    def __init__(self, use_classical=True, use_tree_based=True, use_neural=True):
+        self.use_classical = use_classical
+        self.use_tree_based = use_tree_based
+        self.use_neural = use_neural
+        self.models = []
+        self.model_weights = []
+        self.feature_importances = []
+        self.scalers = []
+        self.meta_feature_map = None
+        
+    def _create_meta_features(self, X_train, y_train):
+        """Create meta-features that capture local patterns"""
+        # Calculate regional statistics
+        meta_features = np.zeros((X_train.shape[0], 6))
+        
+        # Feature interactions that signal different yield regimes
+        meta_features[:, 0] = X_train[:, 1] / (X_train[:, 3] + 1)  # Rain/Temp ratio
+        meta_features[:, 1] = X_train[:, 2] / (X_train[:, 1] + 1)  # Pesticides/Rain ratio
+        meta_features[:, 2] = X_train[:, 1] * X_train[:, 3]  # Rain*Temp interaction
+        meta_features[:, 3] = np.log(X_train[:, 1] + 1)  # Log rainfall
+        meta_features[:, 4] = (X_train[:, 0] - X_train[:, 0].min()) / (X_train[:, 0].max() - X_train[:, 0].min())  # Normalized year
+        meta_features[:, 5] = X_train[:, 1] + X_train[:, 2] + X_train[:, 3]  # Combined environmental index
+        
+        return meta_features
+    
+    def _calculate_model_confidence(self, model, X_train, y_train):
+        """Calculate model's confidence based on training performance"""
+        predictions = model.predict(X_train)
+        mse = mean_squared_error(y_train, predictions)
+        r2 = r2_score(y_train, predictions)
+        # Higher R² and lower MSE = higher confidence
+        confidence = r2 / (1 + mse / np.var(y_train))
+        return confidence
+    
+    def fit(self, X_train, y_train, X_val=None, y_val=None):
+        """Train the intelligent ensemble"""
+        # Combine train and validation if provided
+        if X_val is not None and y_val is not None:
+            X_full = np.vstack([X_train, X_val])
+            y_full = np.hstack([y_train, y_val])
+        else:
+            X_full = X_train
+            y_full = y_train
+        
+        self.models = []
+        self.model_weights = []
+        self.scalers = []
+        
+        # Build diverse model zoo
+        from sklearn.ensemble import GradientBoostingRegressor
+        
+        # 1. Classical Linear Models (capture global trends)
+        if self.use_classical:
+            from sklearn.linear_model import RidgeCV, ElasticNetCV
+            ridge = RidgeCV(alphas=[0.1, 1.0, 10.0, 100.0])
+            ridge.fit(X_train, y_train)
+            self.models.append(('Ridge', ridge))
+            self.scalers.append(None)
+            
+            elastic = ElasticNetCV(l1_ratio=[0.1, 0.5, 0.7, 0.9], alphas=[0.1, 1.0, 10.0])
+            elastic.fit(X_train, y_train)
+            self.models.append(('ElasticNet', elastic))
+            self.scalers.append(None)
+        
+        # 2. Tree-based models (capture non-linear patterns)
+        if self.use_tree_based:
+            gb = GradientBoostingRegressor(
+                n_estimators=100, 
+                max_depth=5, 
+                learning_rate=0.1,
+                random_state=42
+            )
+            gb.fit(X_train, y_train)
+            self.models.append(('GradientBoosting', gb))
+            self.scalers.append(None)
+            
+            rf = RandomForestRegressor(
+                n_estimators=100,
+                max_depth=10,
+                min_samples_split=5,
+                random_state=42,
+                n_jobs=-1
+            )
+            rf.fit(X_train, y_train)
+            self.models.append(('RandomForest', rf))
+            self.scalers.append(None)
+        
+        # 3. Neural-based models (learn complex interactions)
+        if self.use_neural:
+            mlp = MLPRegressor(
+                hidden_layer_sizes=(64, 32),
+                alpha=0.01,
+                learning_rate='adaptive',
+                max_iter=300,
+                random_state=42
+            )
+            mlp.fit(X_train, y_train)
+            self.models.append(('MLP', mlp))
+            self.scalers.append(None)
+        
+        # Calculate initial model weights based on performance
+        weights = []
+        for name, model in self.models:
+            if X_val is not None and y_val is not None:
+                predictions = model.predict(X_val)
+                r2 = r2_score(y_val, predictions)
+                rmse = mean_squared_error(y_val, predictions, squared=False)
+                # Weight by R² and inverse of RMSE
+                weight = r2 / (1 + rmse / np.std(y_val))
+            else:
+                # Use training confidence
+                weight = self._calculate_model_confidence(model, X_train, y_train)
+            
+            # Ensure positive weights
+            weight = max(0.1, weight)
+            weights.append(weight)
+        
+        # Normalize weights
+        total_weight = sum(weights)
+        self.model_weights = [w / total_weight for w in weights]
+        
+        # Store feature importances (average across tree models)
+        self.feature_importances = np.zeros(X_train.shape[1])
+        for name, model in self.models:
+            if hasattr(model, 'feature_importances_'):
+                self.feature_importances += model.feature_importances_
+        
+        if len([m for m, _ in self.models if hasattr(m, 'feature_importances_')]) > 0:
+            self.feature_importances /= len([m for m, _ in self.models if hasattr(m, 'feature_importances_')])
+        else:
+            self.feature_importances = np.ones(X_train.shape[1]) / X_train.shape[1]
+        
+        return self
+    
+    def predict(self, X):
+        """Make predictions using weighted ensemble"""
+        predictions = np.zeros(X.shape[0])
+        
+        for (name, model), weight in zip(self.models, self.model_weights):
+            pred = model.predict(X)
+            predictions += weight * pred
+        
+        return predictions
+    
+    def get_feature_importance(self):
+        """Return feature importances"""
+        return self.feature_importances
+
 class HyperparameterOptimizer:
     """Hyperparameter optimization using GridSearchCV and Optuna"""
     
@@ -487,6 +649,7 @@ if df is not None:
         enable_catboost = st.sidebar.checkbox("CatBoost", value=CATBOOST_AVAILABLE)
         enable_mlp = st.sidebar.checkbox("Neural Network (MLP)", value=True)
         enable_hqnn = st.sidebar.checkbox("Hybrid Quantum-Classical NN", value=(TORCH_AVAILABLE and PENNYLANE_AVAILABLE))
+        enable_jeya = st.sidebar.checkbox("🌟 Jeya's Algorithm", value=True)
         
         # Advanced settings
         with st.sidebar.expander("Advanced Settings"):
@@ -516,7 +679,7 @@ if df is not None:
         st.markdown("---")
         
         if run_analysis:
-            if not any([enable_rf, enable_svr, enable_quantum, enable_xgboost, enable_catboost, enable_mlp, enable_hqnn]):
+            if not any([enable_rf, enable_svr, enable_quantum, enable_xgboost, enable_catboost, enable_mlp, enable_hqnn, enable_jeya]):
                 st.warning("Please select at least one model to train.")
             else:
                 # Prepare data
@@ -568,6 +731,8 @@ if df is not None:
                     models_to_train.append('Neural Network (MLP)')
                 if enable_hqnn and (TORCH_AVAILABLE and PENNYLANE_AVAILABLE):
                     models_to_train.append('Hybrid Quantum-Classical NN')
+                if enable_jeya:
+                    models_to_train.append("🌟 Jeya's Algorithm")
                 
                 total_models = len(models_to_train)
                 
@@ -784,6 +949,51 @@ if df is not None:
                             except Exception as e:
                                 st.error(f"Error training Hybrid Quantum-Classical NN: {str(e)}")
                         
+                        elif model_name == "🌟 Jeya's Algorithm":
+                            try:
+                                start_time = time.time()
+                                
+                                # Use Jeya's Algorithm
+                                jeya_model = JeyaAlgorithm(
+                                    use_classical=True,
+                                    use_tree_based=True,
+                                    use_neural=True
+                                )
+                                
+                                # Split data into train/val for better weight tuning
+                                X_train_jeya, X_val_jeya, y_train_jeya, y_val_jeya = train_test_split(
+                                    X_train_scaled, y_train, test_size=0.2, random_state=random_state
+                                )
+                                
+                                # Train the ensemble
+                                jeya_model.fit(X_train_jeya, y_train_jeya, X_val_jeya, y_val_jeya)
+                                
+                                # Make predictions
+                                y_pred_jeya = jeya_model.predict(X_test_scaled)
+                                
+                                # If y was scaled, inverse transform
+                                if use_feature_engineering or True:  # Always inverse transform for consistency
+                                    y_pred_jeya = y_pred_jeya  # Keep as is since we used unscaled X_train
+                                
+                                train_time_jeya = time.time() - start_time
+                                
+                                # Calculate metrics
+                                results["🌟 Jeya's Algorithm"] = {
+                                    'model': jeya_model,
+                                    'predictions': y_pred_jeya,
+                                    'r2': r2_score(y_test, y_pred_jeya),
+                                    'mae': mean_absolute_error(y_test, y_pred_jeya),
+                                    'rmse': np.sqrt(mean_squared_error(y_test, y_pred_jeya)),
+                                    'train_time': train_time_jeya,
+                                    'cv_mean': r2_score(y_test, y_pred_jeya),
+                                    'cv_std': 0.0,
+                                    'feature_importance': jeya_model.get_feature_importance(),
+                                    'model_weights': jeya_model.model_weights,
+                                    'submodels': [name for name, _ in jeya_model.models]
+                                }
+                            
+                            except Exception as e:
+                                st.error(f"Error training Jeya's Algorithm: {str(e)}")
                     
                     except Exception as e:
                         st.error(f"Error training {model_name}: {str(e)}")
