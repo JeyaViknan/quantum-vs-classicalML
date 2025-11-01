@@ -66,11 +66,6 @@ try:
 except ImportError:
     PENNYLANE_AVAILABLE = False
 
-try:
-    from advanced_hybrid_nn import AdvancedHybridTrainer, visualize_quantum_circuit_structure, visualize_quantum_outputs
-    ADVANCED_HYBRID_AVAILABLE = True
-except ImportError:
-    ADVANCED_HYBRID_AVAILABLE = False
 
 # Set page config
 st.set_page_config(
@@ -492,7 +487,6 @@ if df is not None:
         enable_catboost = st.sidebar.checkbox("CatBoost", value=CATBOOST_AVAILABLE)
         enable_mlp = st.sidebar.checkbox("Neural Network (MLP)", value=True)
         enable_hqnn = st.sidebar.checkbox("Hybrid Quantum-Classical NN", value=(TORCH_AVAILABLE and PENNYLANE_AVAILABLE))
-        enable_advanced_hybrid = st.sidebar.checkbox("Advanced Hybrid NN (with PCA)", value=(ADVANCED_HYBRID_AVAILABLE and TORCH_AVAILABLE and PENNYLANE_AVAILABLE))
         
         # Advanced settings
         with st.sidebar.expander("Advanced Settings"):
@@ -522,7 +516,7 @@ if df is not None:
         st.markdown("---")
         
         if run_analysis:
-            if not any([enable_rf, enable_svr, enable_quantum, enable_xgboost, enable_catboost, enable_mlp, enable_hqnn, enable_advanced_hybrid]):
+            if not any([enable_rf, enable_svr, enable_quantum, enable_xgboost, enable_catboost, enable_mlp, enable_hqnn]):
                 st.warning("Please select at least one model to train.")
             else:
                 # Prepare data
@@ -574,8 +568,6 @@ if df is not None:
                     models_to_train.append('Neural Network (MLP)')
                 if enable_hqnn and (TORCH_AVAILABLE and PENNYLANE_AVAILABLE):
                     models_to_train.append('Hybrid Quantum-Classical NN')
-                if enable_advanced_hybrid and ADVANCED_HYBRID_AVAILABLE and TORCH_AVAILABLE and PENNYLANE_AVAILABLE:
-                    models_to_train.append('Advanced Hybrid NN (with PCA)')
                 
                 total_models = len(models_to_train)
                 
@@ -792,58 +784,6 @@ if df is not None:
                             except Exception as e:
                                 st.error(f"Error training Hybrid Quantum-Classical NN: {str(e)}")
                         
-                        elif model_name == 'Advanced Hybrid NN (with PCA)':
-                            try:
-                                start_time = time.time()
-                                
-                                trainer = AdvancedHybridTrainer(
-                                    n_qubits=4,
-                                    n_layers=2,
-                                    learning_rate=0.001
-                                )
-                                
-                                cv_result = trainer.train_cv(
-                                    X_train, y_train,
-                                    n_splits=5,
-                                    epochs=50,
-                                    batch_size=16
-                                )
-                                
-                                train_time_advanced = time.time() - start_time
-                                
-                                # Use best fold model for predictions
-                                best_fold = max(enumerate(cv_result['fold_results']), 
-                                              key=lambda x: x[1]['r2'])
-                                best_model = best_fold[1]['model']
-                                best_preprocessor = best_fold[1]['preprocessor']
-                                
-                                # Make predictions on test set
-                                X_test_processed, _ = best_preprocessor.transform(X_test_scaled)
-                                device = next(best_model.parameters()).device
-                                X_test_tensor = torch.tensor(X_test_processed, dtype=torch.float32).to(device)
-                                best_model.eval()
-                                with torch.no_grad():
-                                    y_pred_scaled = best_model(X_test_tensor).detach().cpu().numpy().flatten()
-                                
-                                # Inverse transform predictions back to original scale
-                                y_pred_advanced = best_preprocessor.y_scaler.inverse_transform(y_pred_scaled.reshape(-1, 1)).flatten()
-                                
-                                results['Advanced Hybrid NN (with PCA)'] = {
-                                    'model': best_model,
-                                    'predictions': y_pred_advanced,
-                                    'r2': r2_score(y_test, y_pred_advanced),
-                                    'mae': mean_absolute_error(y_test, y_pred_advanced),
-                                    'rmse': np.sqrt(mean_squared_error(y_test, y_pred_advanced)),
-                                    'train_time': train_time_advanced,
-                                    'cv_mean': cv_result['avg_r2'],
-                                    'cv_std': 0.0,
-                                    'cv_result': cv_result,
-                                    'X_test_processed': X_test_processed,
-                                    'preprocessor': best_preprocessor
-                                }
-                            
-                            except Exception as e:
-                                st.error(f"Error training Advanced Hybrid NN: {str(e)}")
                     
                     except Exception as e:
                         st.error(f"Error training {model_name}: {str(e)}")
@@ -1064,66 +1004,6 @@ if df is not None:
                             fig = visualize_quantum_outputs(result['model'], result['X_test_scaled'][:50])
                             st.pyplot(fig)
                             plt.close()
-                
-                advanced_hybrid_results = {k: v for k, v in results.items() if 'trainer' in v and 'Advanced Hybrid NN (with PCA)' in k}
-                
-                if advanced_hybrid_results:
-                    for model_name, result in advanced_hybrid_results.items():
-                        st.markdown(f"#### {model_name}")
-                        
-                        col1, col2 = st.columns(2)
-                        
-                        with col1:
-                            # Quantum circuit structure
-                            fig = visualize_quantum_circuit_structure(n_qubits=4, n_layers=1)
-                            st.pyplot(fig)
-                            plt.close()
-                        
-                        with col2:
-                            # Quantum output distribution
-                            fig = visualize_quantum_outputs(result['model'], result['X_test_scaled'][:50])
-                            st.pyplot(fig)
-                            plt.close()
-                
-                # Advanced Hybrid Model Analysis
-                advanced_hybrid_results = {k: v for k, v in results.items() if 'cv_result' in v}
-                
-                if advanced_hybrid_results:
-                    st.markdown("### Advanced Hybrid NN Analysis")
-                    
-                    for model_name, result in advanced_hybrid_results.items():
-                        col1, col2 = st.columns(2)
-                        
-                        with col1:
-                            st.markdown(f"#### {model_name}")
-                            st.metric("Cross-Validation R²", f"{result['cv_mean']:.4f}")
-                            st.metric("Test R²", f"{result['r2']:.4f}")
-                            st.metric("Test RMSE", f"{result['rmse']:.2f}")
-                            
-                            # Quantum circuit structure
-                            fig = visualize_quantum_circuit_structure(n_qubits=4, n_layers=2)
-                            st.pyplot(fig)
-                            plt.close()
-                        
-                        with col2:
-                            # Quantum output distribution
-                            fig = visualize_quantum_outputs(result['model'], result['X_test_processed'][:50])
-                            st.pyplot(fig)
-                            plt.close()
-                        
-                        # Cross-validation fold results
-                        st.markdown("#### Fold-wise Performance")
-                        fold_data = []
-                        for fold_idx, fold_result in enumerate(result['cv_result']['fold_results']):
-                            fold_data.append({
-                                'Fold': fold_idx + 1,
-                                'R² Score': f"{fold_result['r2']:.4f}",
-                                'RMSE': f"{fold_result['rmse']:.2f}",
-                                'MAE': f"{fold_result['mae']:.2f}"
-                            })
-                        
-                        fold_df = pd.DataFrame(fold_data)
-                        st.dataframe(fold_df, use_container_width=True, hide_index=True)
     
     with tab2:
         st.markdown("## Hyperparameter Tuning")
