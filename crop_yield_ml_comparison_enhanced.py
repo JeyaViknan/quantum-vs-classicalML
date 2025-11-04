@@ -256,9 +256,9 @@ class FeatureEngineer:
         poly = PolynomialFeatures(degree=degree, include_bias=False)
         return poly.fit_transform(X)
 
-class JeyaAlgorithm:
+class AgriEnsemble:
     """
-    Jeya's Algorithm - An Enhanced Intelligent Ensemble Pipeline for Crop Yield Prediction
+    AGRI-ENSEMBLE - Adaptive Agricultural Yield Prediction Ensemble
     
     Philosophy: "Harness the collective wisdom of diverse models while adapting to local patterns"
     
@@ -865,7 +865,7 @@ if df is not None:
         enable_catboost = st.sidebar.checkbox("CatBoost", value=CATBOOST_AVAILABLE)
         enable_mlp = st.sidebar.checkbox("Neural Network (MLP)", value=True)
         enable_hqnn = st.sidebar.checkbox("Hybrid Quantum-Classical NN", value=(TORCH_AVAILABLE and PENNYLANE_AVAILABLE))
-        enable_jeya = st.sidebar.checkbox("Jeya's Algorithm", value=True)
+        enable_agri_ensemble = st.sidebar.checkbox("AGRI-ENSEMBLE", value=True)
         
         # Advanced settings
         with st.sidebar.expander("Advanced Settings"):
@@ -895,7 +895,7 @@ if df is not None:
         st.markdown("---")
         
         if run_analysis:
-            if not any([enable_rf, enable_svr, enable_quantum, enable_xgboost, enable_catboost, enable_mlp, enable_hqnn, enable_jeya]):
+            if not any([enable_rf, enable_svr, enable_quantum, enable_xgboost, enable_catboost, enable_mlp, enable_hqnn, enable_agri_ensemble]):
                 st.warning("Please select at least one model to train.")
             else:
                 # Prepare data
@@ -947,8 +947,8 @@ if df is not None:
                     models_to_train.append('Neural Network (MLP)')
                 if enable_hqnn and (TORCH_AVAILABLE and PENNYLANE_AVAILABLE):
                     models_to_train.append('Hybrid Quantum-Classical NN')
-                if enable_jeya:
-                    models_to_train.append("Jeya's Algorithm")
+                if enable_agri_ensemble:
+                    models_to_train.append("AGRI-ENSEMBLE")
                 
                 total_models = len(models_to_train)
                 
@@ -1165,12 +1165,12 @@ if df is not None:
                             except Exception as e:
                                 st.error(f"Error training Hybrid Quantum-Classical NN: {str(e)}")
                         
-                        elif model_name == "Jeya's Algorithm":
+                        elif model_name == "AGRI-ENSEMBLE":
                             try:
                                 start_time = time.time()
                                 
-                                # Use Jeya's Algorithm
-                                jeya_model = JeyaAlgorithm(
+                                # Use AGRI-ENSEMBLE
+                                agri_model = AgriEnsemble(
                                     use_classical=True,
                                     use_tree_based=True,
                                     use_neural=True,
@@ -1178,26 +1178,26 @@ if df is not None:
                                 )
                                 
                                 # Split data into train/val for better weight tuning
-                                X_train_jeya, X_val_jeya, y_train_jeya, y_val_jeya = train_test_split(
+                                X_train_agri, X_val_agri, y_train_agri, y_val_agri = train_test_split(
                                     X_train_scaled, y_train, test_size=0.2, random_state=random_state
                                 )
                                 
                                 # Train the ensemble
-                                jeya_model.fit(X_train_jeya, y_train_jeya, X_val_jeya, y_val_jeya)
+                                agri_model.fit(X_train_agri, y_train_agri, X_val_agri, y_val_agri)
                                 
                                 # Make predictions with uncertainty
-                                y_pred_jeya, y_pred_uncertainty = jeya_model.predict(X_test_scaled, return_uncertainty=True)
+                                y_pred_agri, y_pred_uncertainty = agri_model.predict(X_test_scaled, return_uncertainty=True)
                                 
-                                train_time_jeya = time.time() - start_time
+                                train_time_agri = time.time() - start_time
                                 
                                 # Get individual metrics and weights
-                                individual_metrics = jeya_model.get_individual_metrics()
-                                model_weights = jeya_model.get_model_weights()
-                                feature_importance = jeya_model.get_feature_importance()
+                                individual_metrics = agri_model.get_individual_metrics()
+                                model_weights = agri_model.get_model_weights()
+                                feature_importance = agri_model.get_feature_importance()
                                 
                                 # Print detailed metrics
                                 print("\n" + "="*80)
-                                print("JEYA'S ALGORITHM - DETAILED RESULTS")
+                                print("AGRI-ENSEMBLE - DETAILED RESULTS")
                                 print("="*80)
                                 
                                 print("\n--- Individual Model Performance ---")
@@ -1208,15 +1208,15 @@ if df is not None:
                                 for model_name, weight in sorted(model_weights.items(), key=lambda x: x[1], reverse=True):
                                     print(f"{model_name:20s} | Weight: {weight:6.4f} ({weight*100:5.2f}%)")
                                 
-                                ensemble_r2 = r2_score(y_test, y_pred_jeya)
-                                ensemble_rmse = np.sqrt(mean_squared_error(y_test, y_pred_jeya))
-                                ensemble_mae = mean_absolute_error(y_test, y_pred_jeya)
+                                ensemble_r2 = r2_score(y_test, y_pred_agri)
+                                ensemble_rmse = np.sqrt(mean_squared_error(y_test, y_pred_agri))
+                                ensemble_mae = mean_absolute_error(y_test, y_pred_agri)
                                 
                                 print("\n--- Final Ensemble Performance ---")
                                 print(f"R² Score:  {ensemble_r2:.4f}")
                                 print(f"RMSE:      {ensemble_rmse:.2f}")
                                 print(f"MAE:       {ensemble_mae:.2f}")
-                                print(f"Training Time: {train_time_jeya:.2f}s")
+                                print(f"Training Time: {train_time_agri:.2f}s")
                                 print(f"Avg Uncertainty: {np.mean(y_pred_uncertainty):.2f}")
                                 
                                 # Get feature names
@@ -1230,24 +1230,24 @@ if df is not None:
                                 print("="*80 + "\n")
                                 
                                 # Calculate metrics
-                                results["Jeya's Algorithm"] = {
-                                    'model': jeya_model,
-                                    'predictions': y_pred_jeya,
+                                results["AGRI-ENSEMBLE"] = {
+                                    'model': agri_model,
+                                    'predictions': y_pred_agri,
                                     'uncertainty': y_pred_uncertainty,
                                     'r2': ensemble_r2,
                                     'mae': ensemble_mae,
                                     'rmse': ensemble_rmse,
-                                    'train_time': train_time_jeya,
+                                    'train_time': train_time_agri,
                                     'cv_mean': ensemble_r2,
                                     'cv_std': 0.0,
                                     'feature_importance': feature_importance,
                                     'model_weights': model_weights,
                                     'individual_metrics': individual_metrics,
-                                    'submodels': [name for name, _ in jeya_model.models]
+                                    'submodels': [name for name, _ in agri_model.models]
                                 }
                             
                             except Exception as e:
-                                st.error(f"Error training Jeya's Algorithm: {str(e)}")
+                                st.error(f"Error training AGRI-ENSEMBLE: {str(e)}")
                                 import traceback
                                 print(traceback.format_exc())
                     

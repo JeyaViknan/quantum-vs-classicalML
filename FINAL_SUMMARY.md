@@ -1,4 +1,4 @@
-# Final Summary: Jeya's Algorithm Implementation
+# Final Summary: AGRI-ENSEMBLE Implementation
 
 ## ✅ All Improvements Completed
 
@@ -45,7 +45,7 @@
 
 ## Ready to Run
 
-The enhanced Jeya's Algorithm is now ready for use! 🎉
+The enhanced AGRI-ENSEMBLE is now ready for use! 🎉
 
 All features requested have been implemented, tested, and debugged.
 
