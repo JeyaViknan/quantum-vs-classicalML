@@ -1,6 +1,6 @@
 # 🌾 Crop Yield Prediction: Classical vs Quantum ML
 
-A comprehensive Streamlit application comparing classical machine learning models (Random Forest, SVR) with quantum machine learning (Quantum SVR) and an advanced ensemble method (AGRI-ENSEMBLE) for agricultural crop yield prediction.
+A comprehensive Streamlit application comparing classical machine learning models (Random Forest, SVR) with quantum machine learning (Quantum SVR) and an advanced ensemble method (MetaFustion) for agricultural crop yield prediction.
 
 ## ✨ Features
 
@@ -8,14 +8,14 @@ A comprehensive Streamlit application comparing classical machine learning model
 - **Random Forest Regressor** - Ensemble learning with customizable parameters
 - **Support Vector Regression (SVR)** - Kernel-based regression with RBF kernel
 - **Quantum SVR** - Quantum-enhanced support vector regression using Qiskit
-- **AGRI-ENSEMBLE** - Advanced ensemble combining 5 diverse models (Ridge, ElasticNet, Gradient Boosting, Random Forest, MLP) with meta-learning
+- **MetaFustion** - Advanced ensemble combining 5 diverse models (Ridge, ElasticNet, Gradient Boosting, Random Forest, MLP) with meta-learning
 
 ### 📊 Comprehensive Analysis
 - **Performance Metrics**: R² Score, MAE, RMSE, Training Time
 - **Cross-Validation**: 5-fold CV scores for robust evaluation
 - **Feature Importance**: Understand which factors drive predictions
 - **Residual Analysis**: Visualize prediction errors and patterns
-- **Uncertainty Estimation**: Identify low-confidence predictions (AGRI-ENSEMBLE)
+- **Uncertainty Estimation**: Identify low-confidence predictions (MetaFustion)
 
 ### 📈 Rich Visualizations
 - Actual vs Predicted scatter plots
@@ -166,9 +166,9 @@ The Quantum SVR model uses:
 
 **Note**: Quantum models are computationally intensive and may take longer to train, especially with large datasets.
 
-## 🌟 AGRI-ENSEMBLE Algorithm
+## 🌟 MetaFustion Algorithm
 
-AGRI-ENSEMBLE (Adaptive Gradient-boosted Ridge-enhanced Intelligent Ensemble Model with Meta-learning) is an advanced ensemble method that combines 5 diverse models:
+MetaFustion is an advanced ensemble method that combines 5 diverse models:
 
 ### Base Models
 1. **Ridge Regression** - Linear trends with L2 regularization
@@ -248,7 +248,7 @@ Typical performance on agricultural datasets:
 - **Random Forest**: R² ~ 0.85-0.95, Fast training
 - **SVR**: R² ~ 0.80-0.90, Moderate training time
 - **Quantum SVR**: R² ~ 0.75-0.90, Slower training
-- **AGRI-ENSEMBLE**: R² ~ 0.85-0.95, Best stability
+- **MetaFustion**: R² ~ 0.85-0.95, Best stability
 
 ## 🤝 Contributing
 

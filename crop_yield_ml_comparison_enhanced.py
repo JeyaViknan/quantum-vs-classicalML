@@ -256,9 +256,9 @@ class FeatureEngineer:
         poly = PolynomialFeatures(degree=degree, include_bias=False)
         return poly.fit_transform(X)
 
-class AgriEnsemble:
+class MetaFustion:
     """
-    AGRI-ENSEMBLE - Adaptive Agricultural Yield Prediction Ensemble
+    MetaFustion - Adaptive Agricultural Yield Prediction Ensemble
     
     Philosophy: "Harness the collective wisdom of diverse models while adapting to local patterns"
     
@@ -865,7 +865,7 @@ if df is not None:
         enable_catboost = st.sidebar.checkbox("CatBoost", value=CATBOOST_AVAILABLE)
         enable_mlp = st.sidebar.checkbox("Neural Network (MLP)", value=True)
         enable_hqnn = st.sidebar.checkbox("Hybrid Quantum-Classical NN", value=(TORCH_AVAILABLE and PENNYLANE_AVAILABLE))
-        enable_agri_ensemble = st.sidebar.checkbox("AGRI-ENSEMBLE", value=True)
+        enable_agri_ensemble = st.sidebar.checkbox("MetaFustion", value=True)
         
         # Advanced settings
         with st.sidebar.expander("Advanced Settings"):
@@ -948,7 +948,7 @@ if df is not None:
                 if enable_hqnn and (TORCH_AVAILABLE and PENNYLANE_AVAILABLE):
                     models_to_train.append('Hybrid Quantum-Classical NN')
                 if enable_agri_ensemble:
-                    models_to_train.append("AGRI-ENSEMBLE")
+                    models_to_train.append("MetaFustion")
                 
                 total_models = len(models_to_train)
                 
@@ -1165,12 +1165,12 @@ if df is not None:
                             except Exception as e:
                                 st.error(f"Error training Hybrid Quantum-Classical NN: {str(e)}")
                         
-                        elif model_name == "AGRI-ENSEMBLE":
+                        elif model_name == "MetaFustion":
                             try:
                                 start_time = time.time()
                                 
-                                # Use AGRI-ENSEMBLE
-                                agri_model = AgriEnsemble(
+                                # Use MetaFustion
+                                agri_model = MetaFustion(
                                     use_classical=True,
                                     use_tree_based=True,
                                     use_neural=True,
@@ -1197,7 +1197,7 @@ if df is not None:
                                 
                                 # Print detailed metrics
                                 print("\n" + "="*80)
-                                print("AGRI-ENSEMBLE - DETAILED RESULTS")
+                                print("MetaFustion - DETAILED RESULTS")
                                 print("="*80)
                                 
                                 print("\n--- Individual Model Performance ---")
@@ -1230,7 +1230,7 @@ if df is not None:
                                 print("="*80 + "\n")
                                 
                                 # Calculate metrics
-                                results["AGRI-ENSEMBLE"] = {
+                                results["MetaFustion"] = {
                                     'model': agri_model,
                                     'predictions': y_pred_agri,
                                     'uncertainty': y_pred_uncertainty,
@@ -1247,7 +1247,7 @@ if df is not None:
                                 }
                             
                             except Exception as e:
-                                st.error(f"Error training AGRI-ENSEMBLE: {str(e)}")
+                                st.error(f"Error training MetaFustion: {str(e)}")
                                 import traceback
                                 print(traceback.format_exc())
                     
