@@ -7,7 +7,6 @@ scikit-learn
 xgboost
 catboost
 shap
-optuna
 qiskit>=1.0.0
 qiskit-machine-learning>=0.7.0
 qiskit-algorithms>=0.3.0

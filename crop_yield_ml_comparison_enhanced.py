@@ -36,11 +36,7 @@ try:
 except ImportError:
     SHAP_AVAILABLE = False
 
-try:
-    import optuna
-    OPTUNA_AVAILABLE = True
-except ImportError:
-    OPTUNA_AVAILABLE = False
+# Optuna removed: using GridSearchCV only
 
 try:
     from qiskit import QuantumCircuit
@@ -635,122 +631,64 @@ class MetaFustion:
         return dict(zip([name for name, _ in self.models], self.model_weights))
 
 class HyperparameterOptimizer:
-    """Hyperparameter optimization using GridSearchCV and Optuna"""
+    """Hyperparameter optimization using GridSearchCV"""
     
     @staticmethod
-    def optimize_random_forest(X_train, y_train, use_optuna=False):
-        """Optimize Random Forest hyperparameters"""
-        if use_optuna and OPTUNA_AVAILABLE:
-            def objective(trial):
-                n_estimators = trial.suggest_int('n_estimators', 50, 300)
-                max_depth = trial.suggest_int('max_depth', 5, 30)
-                min_samples_split = trial.suggest_int('min_samples_split', 2, 10)
-                min_samples_leaf = trial.suggest_int('min_samples_leaf', 1, 5)
-                
-                model = RandomForestRegressor(
-                    n_estimators=n_estimators,
-                    max_depth=max_depth,
-                    min_samples_split=min_samples_split,
-                    min_samples_leaf=min_samples_leaf,
-                    random_state=42,
-                    n_jobs=-1
-                )
-                
-                scores = cross_val_score(model, X_train, y_train, cv=3, scoring='r2')
-                return scores.mean()
-            
-            study = optuna.create_study(direction='maximize')
-            study.optimize(objective, n_trials=20, show_progress_bar=False)
-            return study.best_params
-        else:
-            param_grid = {
-                'n_estimators': [50, 100, 200],
-                'max_depth': [5, 10, 15, 20],
-                'min_samples_split': [2, 5, 10],
-                'min_samples_leaf': [1, 2, 4]
-            }
-            
-            grid_search = GridSearchCV(
-                RandomForestRegressor(random_state=42, n_jobs=-1),
-                param_grid,
-                cv=3,
-                scoring='r2',
-                n_jobs=-1
-            )
-            grid_search.fit(X_train, y_train)
-            return grid_search.best_params_
+    def optimize_random_forest(X_train, y_train):
+        """Optimize Random Forest hyperparameters using GridSearchCV"""
+        param_grid = {
+            'n_estimators': [50, 100, 200],
+            'max_depth': [5, 10, 15, 20],
+            'min_samples_split': [2, 5, 10],
+            'min_samples_leaf': [1, 2, 4]
+        }
+        grid_search = GridSearchCV(
+            RandomForestRegressor(random_state=42, n_jobs=-1),
+            param_grid,
+            cv=3,
+            scoring='r2',
+            n_jobs=-1
+        )
+        grid_search.fit(X_train, y_train)
+        return grid_search.best_params_
     
     @staticmethod
-    def optimize_svr(X_train, y_train, use_optuna=False):
-        """Optimize SVR hyperparameters"""
-        if use_optuna and OPTUNA_AVAILABLE:
-            def objective(trial):
-                C = trial.suggest_float('C', 0.1, 100, log=True)
-                epsilon = trial.suggest_float('epsilon', 0.01, 1.0)
-                gamma = trial.suggest_float('gamma', 0.001, 1.0, log=True)
-                
-                model = SVR(C=C, epsilon=epsilon, gamma=gamma, kernel='rbf')
-                scores = cross_val_score(model, X_train, y_train, cv=3, scoring='r2')
-                return scores.mean()
-            
-            study = optuna.create_study(direction='maximize')
-            study.optimize(objective, n_trials=20, show_progress_bar=False)
-            return study.best_params
-        else:
-            param_grid = {
-                'C': [0.1, 1, 10, 100],
-                'epsilon': [0.01, 0.1, 0.5],
-                'gamma': ['scale', 'auto', 0.001, 0.01, 0.1]
-            }
-            
-            grid_search = GridSearchCV(
-                SVR(kernel='rbf'),
-                param_grid,
-                cv=3,
-                scoring='r2',
-                n_jobs=-1
-            )
-            grid_search.fit(X_train, y_train)
-            return grid_search.best_params_
+    def optimize_svr(X_train, y_train):
+        """Optimize SVR hyperparameters using GridSearchCV"""
+        param_grid = {
+            'C': [0.1, 1, 10, 100],
+            'epsilon': [0.01, 0.1, 0.5],
+            'gamma': ['scale', 'auto', 0.001, 0.01, 0.1]
+        }
+        grid_search = GridSearchCV(
+            SVR(kernel='rbf'),
+            param_grid,
+            cv=3,
+            scoring='r2',
+            n_jobs=-1
+        )
+        grid_search.fit(X_train, y_train)
+        return grid_search.best_params_
     
     @staticmethod
-    def optimize_xgboost(X_train, y_train, use_optuna=False):
-        """Optimize XGBoost hyperparameters"""
-        if use_optuna and OPTUNA_AVAILABLE:
-            def objective(trial):
-                params = {
-                    'max_depth': trial.suggest_int('max_depth', 3, 10),
-                    'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.3, log=True),
-                    'n_estimators': trial.suggest_int('n_estimators', 50, 300),
-                    'subsample': trial.suggest_float('subsample', 0.5, 1.0),
-                    'colsample_bytree': trial.suggest_float('colsample_bytree', 0.5, 1.0),
-                }
-                
-                model = xgb.XGBRegressor(**params, random_state=42, verbosity=0)
-                scores = cross_val_score(model, X_train, y_train, cv=3, scoring='r2')
-                return scores.mean()
-            
-            study = optuna.create_study(direction='maximize')
-            study.optimize(objective, n_trials=20, show_progress_bar=False)
-            return study.best_params
-        else:
-            param_grid = {
-                'max_depth': [3, 5, 7, 10],
-                'learning_rate': [0.01, 0.05, 0.1],
-                'n_estimators': [50, 100, 200],
-                'subsample': [0.7, 0.9, 1.0],
-                'colsample_bytree': [0.7, 0.9, 1.0]
-            }
-            
-            grid_search = GridSearchCV(
-                xgb.XGBRegressor(random_state=42, verbosity=0),
-                param_grid,
-                cv=3,
-                scoring='r2',
-                n_jobs=-1
-            )
-            grid_search.fit(X_train, y_train)
-            return grid_search.best_params_
+    def optimize_xgboost(X_train, y_train):
+        """Optimize XGBoost hyperparameters using GridSearchCV"""
+        param_grid = {
+            'max_depth': [3, 5, 7, 10],
+            'learning_rate': [0.01, 0.05, 0.1],
+            'n_estimators': [50, 100, 200],
+            'subsample': [0.7, 0.9, 1.0],
+            'colsample_bytree': [0.7, 0.9, 1.0]
+        }
+        grid_search = GridSearchCV(
+            xgb.XGBRegressor(random_state=42, verbosity=0),
+            param_grid,
+            cv=3,
+            scoring='r2',
+            n_jobs=-1
+        )
+        grid_search.fit(X_train, y_train)
+        return grid_search.best_params_
 
 class QuantumInspiredKernel:
     """Quantum-inspired kernel using periodic feature encoding"""
@@ -873,7 +811,6 @@ if df is not None:
             random_state = st.number_input("Random State", 0, 100, 42)
             use_feature_engineering = st.checkbox("Enable Feature Engineering", value=True)
             use_hyperparameter_tuning = st.checkbox("Enable Hyperparameter Tuning", value=False)
-            use_optuna = st.checkbox("Use Optuna (if available)", value=False)
         
         st.sidebar.markdown("---")
         run_analysis = st.sidebar.button("Run Analysis", type="primary", use_container_width=True)
@@ -960,7 +897,7 @@ if df is not None:
                             start_time = time.time()
                             
                             if use_hyperparameter_tuning:
-                                best_params = HyperparameterOptimizer.optimize_random_forest(X_train_scaled, y_train, use_optuna)
+                                best_params = HyperparameterOptimizer.optimize_random_forest(X_train_scaled, y_train)
                                 rf_model = RandomForestRegressor(**best_params, random_state=random_state, n_jobs=-1)
                             else:
                                 rf_model = RandomForestRegressor(n_estimators=100, max_depth=10, random_state=random_state, n_jobs=-1)
@@ -987,7 +924,7 @@ if df is not None:
                             start_time = time.time()
                             
                             if use_hyperparameter_tuning:
-                                best_params = HyperparameterOptimizer.optimize_svr(X_train_scaled, y_train_scaled, use_optuna)
+                                best_params = HyperparameterOptimizer.optimize_svr(X_train_scaled, y_train_scaled)
                                 svr_model = SVR(**best_params)
                             else:
                                 svr_model = SVR(C=1.0, epsilon=0.1, kernel='rbf', gamma='scale')
@@ -1036,7 +973,7 @@ if df is not None:
                             start_time = time.time()
                             
                             if use_hyperparameter_tuning:
-                                best_params = HyperparameterOptimizer.optimize_xgboost(X_train_scaled, y_train, use_optuna)
+                                best_params = HyperparameterOptimizer.optimize_xgboost(X_train_scaled, y_train)
                                 xgb_model = xgb.XGBRegressor(**best_params, random_state=random_state, verbosity=0)
                             else:
                                 xgb_model = xgb.XGBRegressor(n_estimators=100, max_depth=5, learning_rate=0.1, random_state=random_state, verbosity=0)
@@ -1476,16 +1413,10 @@ if df is not None:
         st.info("This tab demonstrates hyperparameter optimization capabilities. Enable 'Hyperparameter Tuning' in Advanced Settings to use optimized parameters.")
         
         st.markdown("""
-        ### Available Optimization Methods
+        ### Optimization Method
         
-        1. **GridSearchCV** - Exhaustive search over specified parameter values
-           - Comprehensive but computationally expensive
-           - Good for smaller parameter spaces
-        
-        2. **Optuna** - Bayesian optimization framework
-           - More efficient than grid search
-           - Adaptive sampling of parameter space
-           - Requires Optuna library
+        - **GridSearchCV**: Exhaustive search over specified parameter values.
+          Suitable for smaller parameter spaces; comprehensive but computationally expensive.
         
         ### Tuned Parameters by Model
         

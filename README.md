@@ -127,7 +127,7 @@ A seed value that ensures reproducible results. Same random state = same train/t
 Creates interaction terms (e.g., Rainfall × Temperature) to help models capture complex relationships. Often improves accuracy by 2-5% R².
 
 #### Hyperparameter Tuning
-Finds optimal model parameters. Can improve R² by 5-15%. The app supports both GridSearchCV and Optuna (Bayesian optimization).
+Finds optimal model parameters. Can improve R² by 5-15%. The app uses GridSearchCV for search.
 
 ## 🔬 Understanding the Results
 
